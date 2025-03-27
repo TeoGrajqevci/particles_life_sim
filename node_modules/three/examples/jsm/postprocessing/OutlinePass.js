@@ -2,6 +2,7 @@ import {
 	AdditiveBlending,
 	Color,
 	DoubleSide,
+	HalfFloatType,
 	Matrix4,
 	MeshDepthMaterial,
 	NoBlending,
@@ -34,7 +35,7 @@ class OutlinePass extends Pass {
 		this.pulsePeriod = 0;
 
 		this._visibilityCache = new Map();
-
+		this._selectionCache = new Set();
 
 		this.resolution = ( resolution !== undefined ) ? new Vector2( resolution.x, resolution.y ) : new Vector2( 256, 256 );
 
@@ -54,36 +55,36 @@ class OutlinePass extends Pass {
 		this.prepareMaskMaterial.side = DoubleSide;
 		this.prepareMaskMaterial.fragmentShader = replaceDepthToViewZ( this.prepareMaskMaterial.fragmentShader, this.renderCamera );
 
-		this.renderTargetDepthBuffer = new WebGLRenderTarget( this.resolution.x, this.resolution.y );
+		this.renderTargetDepthBuffer = new WebGLRenderTarget( this.resolution.x, this.resolution.y, { type: HalfFloatType } );
 		this.renderTargetDepthBuffer.texture.name = 'OutlinePass.depth';
 		this.renderTargetDepthBuffer.texture.generateMipmaps = false;
 
-		this.renderTargetMaskDownSampleBuffer = new WebGLRenderTarget( resx, resy );
+		this.renderTargetMaskDownSampleBuffer = new WebGLRenderTarget( resx, resy, { type: HalfFloatType } );
 		this.renderTargetMaskDownSampleBuffer.texture.name = 'OutlinePass.depthDownSample';
 		this.renderTargetMaskDownSampleBuffer.texture.generateMipmaps = false;
 
-		this.renderTargetBlurBuffer1 = new WebGLRenderTarget( resx, resy );
+		this.renderTargetBlurBuffer1 = new WebGLRenderTarget( resx, resy, { type: HalfFloatType } );
 		this.renderTargetBlurBuffer1.texture.name = 'OutlinePass.blur1';
 		this.renderTargetBlurBuffer1.texture.generateMipmaps = false;
-		this.renderTargetBlurBuffer2 = new WebGLRenderTarget( Math.round( resx / 2 ), Math.round( resy / 2 ) );
+		this.renderTargetBlurBuffer2 = new WebGLRenderTarget( Math.round( resx / 2 ), Math.round( resy / 2 ), { type: HalfFloatType } );
 		this.renderTargetBlurBuffer2.texture.name = 'OutlinePass.blur2';
 		this.renderTargetBlurBuffer2.texture.generateMipmaps = false;
 
 		this.edgeDetectionMaterial = this.getEdgeDetectionMaterial();
-		this.renderTargetEdgeBuffer1 = new WebGLRenderTarget( resx, resy );
+		this.renderTargetEdgeBuffer1 = new WebGLRenderTarget( resx, resy, { type: HalfFloatType } );
 		this.renderTargetEdgeBuffer1.texture.name = 'OutlinePass.edge1';
 		this.renderTargetEdgeBuffer1.texture.generateMipmaps = false;
-		this.renderTargetEdgeBuffer2 = new WebGLRenderTarget( Math.round( resx / 2 ), Math.round( resy / 2 ) );
+		this.renderTargetEdgeBuffer2 = new WebGLRenderTarget( Math.round( resx / 2 ), Math.round( resy / 2 ), { type: HalfFloatType } );
 		this.renderTargetEdgeBuffer2.texture.name = 'OutlinePass.edge2';
 		this.renderTargetEdgeBuffer2.texture.generateMipmaps = false;
 
 		const MAX_EDGE_THICKNESS = 4;
 		const MAX_EDGE_GLOW = 4;
 
-		this.separableBlurMaterial1 = this.getSeperableBlurMaterial( MAX_EDGE_THICKNESS );
+		this.separableBlurMaterial1 = this.getSeparableBlurMaterial( MAX_EDGE_THICKNESS );
 		this.separableBlurMaterial1.uniforms[ 'texSize' ].value.set( resx, resy );
 		this.separableBlurMaterial1.uniforms[ 'kernelRadius' ].value = 1;
-		this.separableBlurMaterial2 = this.getSeperableBlurMaterial( MAX_EDGE_GLOW );
+		this.separableBlurMaterial2 = this.getSeparableBlurMaterial( MAX_EDGE_GLOW );
 		this.separableBlurMaterial2.uniforms[ 'texSize' ].value.set( Math.round( resx / 2 ), Math.round( resy / 2 ) );
 		this.separableBlurMaterial2.uniforms[ 'kernelRadius' ].value = MAX_EDGE_GLOW;
 
@@ -95,7 +96,6 @@ class OutlinePass extends Pass {
 		const copyShader = CopyShader;
 
 		this.copyUniforms = UniformsUtils.clone( copyShader.uniforms );
-		this.copyUniforms[ 'opacity' ].value = 1.0;
 
 		this.materialCopy = new ShaderMaterial( {
 			uniforms: this.copyUniforms,
@@ -103,8 +103,7 @@ class OutlinePass extends Pass {
 			fragmentShader: copyShader.fragmentShader,
 			blending: NoBlending,
 			depthTest: false,
-			depthWrite: false,
-			transparent: true
+			depthWrite: false
 		} );
 
 		this.enabled = true;
@@ -173,28 +172,17 @@ class OutlinePass extends Pass {
 
 	}
 
-	changeVisibilityOfSelectedObjects( bVisible ) {
+	updateSelectionCache() {
 
-		const cache = this._visibilityCache;
+		const cache = this._selectionCache;
 
 		function gatherSelectedMeshesCallBack( object ) {
 
-			if ( object.isMesh ) {
-
-				if ( bVisible === true ) {
-
-					object.visible = cache.get( object );
-
-				} else {
-
-					cache.set( object, object.visible );
-					object.visible = bVisible;
-
-				}
-
-			}
+			if ( object.isMesh ) cache.add( object );
 
 		}
+
+		cache.clear();
 
 		for ( let i = 0; i < this.selectedObjects.length; i ++ ) {
 
@@ -205,23 +193,31 @@ class OutlinePass extends Pass {
 
 	}
 
-	changeVisibilityOfNonSelectedObjects( bVisible ) {
+	changeVisibilityOfSelectedObjects( bVisible ) {
 
 		const cache = this._visibilityCache;
-		const selectedMeshes = [];
 
-		function gatherSelectedMeshesCallBack( object ) {
+		for ( const mesh of this._selectionCache ) {
 
-			if ( object.isMesh ) selectedMeshes.push( object );
+			if ( bVisible === true ) {
+
+				mesh.visible = cache.get( mesh );
+
+			} else {
+
+				cache.set( mesh, mesh.visible );
+				mesh.visible = bVisible;
+
+			}
 
 		}
 
-		for ( let i = 0; i < this.selectedObjects.length; i ++ ) {
+	}
 
-			const selectedObject = this.selectedObjects[ i ];
-			selectedObject.traverse( gatherSelectedMeshesCallBack );
+	changeVisibilityOfNonSelectedObjects( bVisible ) {
 
-		}
+		const visibilityCache = this._visibilityCache;
+		const selectionCache = this._selectionCache;
 
 		function VisibilityChangeCallBack( object ) {
 
@@ -229,47 +225,32 @@ class OutlinePass extends Pass {
 
 				// only meshes and sprites are supported by OutlinePass
 
-				let bFound = false;
-
-				for ( let i = 0; i < selectedMeshes.length; i ++ ) {
-
-					const selectedObjectId = selectedMeshes[ i ].id;
-
-					if ( selectedObjectId === object.id ) {
-
-						bFound = true;
-						break;
-
-					}
-
-				}
-
-				if ( bFound === false ) {
+				if ( ! selectionCache.has( object ) ) {
 
 					const visibility = object.visible;
 
-					if ( bVisible === false || cache.get( object ) === true ) {
+					if ( bVisible === false || visibilityCache.get( object ) === true ) {
 
 						object.visible = bVisible;
 
 					}
 
-					cache.set( object, visibility );
+					visibilityCache.set( object, visibility );
 
 				}
 
 			} else if ( object.isPoints || object.isLine ) {
 
-				// the visibilty of points and lines is always set to false in order to
+				// the visibility of points and lines is always set to false in order to
 				// not affect the outline computation
 
 				if ( bVisible === true ) {
 
-					object.visible = cache.get( object ); // restore
+					object.visible = visibilityCache.get( object ); // restore
 
 				} else {
 
-					cache.set( object, object.visible );
+					visibilityCache.set( object, object.visible );
 					object.visible = bVisible;
 
 				}
@@ -307,10 +288,13 @@ class OutlinePass extends Pass {
 
 			renderer.setClearColor( 0xffffff, 1 );
 
+			this.updateSelectionCache();
+
 			// Make selected objects invisible
 			this.changeVisibilityOfSelectedObjects( false );
 
 			const currentBackground = this.renderScene.background;
+			const currentOverrideMaterial = this.renderScene.overrideMaterial;
 			this.renderScene.background = null;
 
 			// 1. Draw Non Selected objects in the depth buffer
@@ -335,11 +319,12 @@ class OutlinePass extends Pass {
 			renderer.setRenderTarget( this.renderTargetMaskBuffer );
 			renderer.clear();
 			renderer.render( this.renderScene, this.renderCamera );
-			this.renderScene.overrideMaterial = null;
 			this.changeVisibilityOfNonSelectedObjects( true );
 			this._visibilityCache.clear();
+			this._selectionCache.clear();
 
 			this.renderScene.background = currentBackground;
+			this.renderScene.overrideMaterial = currentOverrideMaterial;
 
 			// 2. Downsample to Half resolution
 			this.fsQuad.material = this.materialCopy;
@@ -463,7 +448,7 @@ class OutlinePass extends Pass {
 						worldPosition = instanceMatrix * worldPosition;
 
 					#endif
-					
+
 					worldPosition = modelMatrix * worldPosition;
 
 					projTexCoord = textureMatrix * worldPosition;
@@ -537,7 +522,7 @@ class OutlinePass extends Pass {
 
 	}
 
-	getSeperableBlurMaterial( maxRadius ) {
+	getSeparableBlurMaterial( maxRadius ) {
 
 		return new ShaderMaterial( {
 

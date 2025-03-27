@@ -1,4 +1,5 @@
 import {
+	HalfFloatType,
 	LinearFilter,
 	NearestFilter,
 	ShaderMaterial,
@@ -7,9 +8,7 @@ import {
 	WebGLRenderTarget
 } from 'three';
 import { Pass, FullScreenQuad } from './Pass.js';
-import { SMAAEdgesShader } from '../shaders/SMAAShader.js';
-import { SMAAWeightsShader } from '../shaders/SMAAShader.js';
-import { SMAABlendShader } from '../shaders/SMAAShader.js';
+import { SMAABlendShader, SMAAEdgesShader, SMAAWeightsShader } from '../shaders/SMAAShader.js';
 
 class SMAAPass extends Pass {
 
@@ -20,12 +19,14 @@ class SMAAPass extends Pass {
 		// render targets
 
 		this.edgesRT = new WebGLRenderTarget( width, height, {
-			depthBuffer: false
+			depthBuffer: false,
+			type: HalfFloatType
 		} );
 		this.edgesRT.texture.name = 'SMAAPass.edges';
 
 		this.weightsRT = new WebGLRenderTarget( width, height, {
-			depthBuffer: false
+			depthBuffer: false,
+			type: HalfFloatType
 		} );
 		this.weightsRT.texture.name = 'SMAAPass.weights';
 
@@ -106,8 +107,6 @@ class SMAAPass extends Pass {
 			vertexShader: SMAABlendShader.vertexShader,
 			fragmentShader: SMAABlendShader.fragmentShader
 		} );
-
-		this.needsSwap = false;
 
 		this.fsQuad = new FullScreenQuad( null );
 

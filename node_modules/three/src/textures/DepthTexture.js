@@ -1,11 +1,10 @@
+import { Source } from './Source.js';
 import { Texture } from './Texture.js';
 import { NearestFilter, UnsignedIntType, UnsignedInt248Type, DepthFormat, DepthStencilFormat } from '../constants.js';
 
 class DepthTexture extends Texture {
 
-	constructor( width, height, type, mapping, wrapS, wrapT, magFilter, minFilter, anisotropy, format ) {
-
-		format = format !== undefined ? format : DepthFormat;
+	constructor( width, height, type, mapping, wrapS, wrapT, magFilter, minFilter, anisotropy, format = DepthFormat ) {
 
 		if ( format !== DepthFormat && format !== DepthStencilFormat ) {
 
@@ -28,8 +27,31 @@ class DepthTexture extends Texture {
 		this.flipY = false;
 		this.generateMipmaps = false;
 
+		this.compareFunction = null;
+
 	}
 
+
+	copy( source ) {
+
+		super.copy( source );
+
+		this.source = new Source( Object.assign( {}, source.image ) ); // see #30540
+		this.compareFunction = source.compareFunction;
+
+		return this;
+
+	}
+
+	toJSON( meta ) {
+
+		const data = super.toJSON( meta );
+
+		if ( this.compareFunction !== null ) data.compareFunction = this.compareFunction;
+
+		return data;
+
+	}
 
 }
 

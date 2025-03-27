@@ -1,5 +1,6 @@
 import {
 	AdditiveBlending,
+	HalfFloatType,
 	ShaderMaterial,
 	UniformsUtils,
 	Vector2,
@@ -16,9 +17,9 @@ class BloomPass extends Pass {
 
 		// render targets
 
-		this.renderTargetX = new WebGLRenderTarget(); // will be resized later
+		this.renderTargetX = new WebGLRenderTarget( 1, 1, { type: HalfFloatType } ); // will be resized later
 		this.renderTargetX.texture.name = 'BloomPass.x';
-		this.renderTargetY = new WebGLRenderTarget(); // will be resized later
+		this.renderTargetY = new WebGLRenderTarget( 1, 1, { type: HalfFloatType } ); // will be resized later
 		this.renderTargetY.texture.name = 'BloomPass.y';
 
 		// combine material
@@ -29,6 +30,7 @@ class BloomPass extends Pass {
 
 		this.materialCombine = new ShaderMaterial( {
 
+			name: CombineShader.name,
 			uniforms: this.combineUniforms,
 			vertexShader: CombineShader.vertexShader,
 			fragmentShader: CombineShader.fragmentShader,
@@ -48,6 +50,7 @@ class BloomPass extends Pass {
 
 		this.materialConvolution = new ShaderMaterial( {
 
+			name: convolutionShader.name,
 			uniforms: this.convolutionUniforms,
 			vertexShader: convolutionShader.vertexShader,
 			fragmentShader: convolutionShader.fragmentShader,
@@ -68,7 +71,7 @@ class BloomPass extends Pass {
 
 		if ( maskActive ) renderer.state.buffers.stencil.setTest( false );
 
-		// Render quad with blured scene into texture (convolution pass 1)
+		// Render quad with blurred scene into texture (convolution pass 1)
 
 		this.fsQuad.material = this.materialConvolution;
 
@@ -80,7 +83,7 @@ class BloomPass extends Pass {
 		this.fsQuad.render( renderer );
 
 
-		// Render quad with blured scene into texture (convolution pass 2)
+		// Render quad with blurred scene into texture (convolution pass 2)
 
 		this.convolutionUniforms[ 'tDiffuse' ].value = this.renderTargetX.texture;
 		this.convolutionUniforms[ 'uImageIncrement' ].value = BloomPass.blurY;
@@ -125,6 +128,8 @@ class BloomPass extends Pass {
 }
 
 const CombineShader = {
+
+	name: 'CombineShader',
 
 	uniforms: {
 
