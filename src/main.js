@@ -7,12 +7,12 @@ import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/js
 // GLOBAL SETTINGS & STATE
 // ──────────────────────────────
 const settings = {
-  seed: 91651088029,
+  seed: 148624312259077,
   fps: 0,
   dimensions: 1000,
   atoms: {
-    count: 750, // per color
-    radius: 0.5
+    count: 600, // per color
+    radius: 0.7
   },
   drawings: {
     lines: false,       // (Optional) draw interaction lines
@@ -38,9 +38,9 @@ const settings = {
     { name: 'yellow', value: '#ffff00' },
     { name: 'blue', value: '#0000ff' }
   ],
-  time_scale: 1.0,
-  cutOff: 15000 * 2,    // cutoff squared (i.e. only if distance^2 < cutOff)
-  viscosity: 0.7,
+  time_scale: 0.25,
+  cutOff: 20000 * 2,    // cutoff squared (i.e. only if distance^2 < cutOff)
+  viscosity: 1.7,
   pulseDuration: 1,
   reset: () => resetScene(),
   randomRules: () => {
@@ -323,7 +323,7 @@ function initScene() {
   document.body.appendChild(container);
 
   const aspect = window.innerWidth / window.innerHeight;
-  settings.scene.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 5000);
+  settings.scene.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000);
   settings.scene.camera.position.set(settings.dimensions * 2, settings.dimensions * 2, settings.dimensions * 2);
   settings.scene.scene = new THREE.Scene();
 
@@ -369,7 +369,7 @@ function setupGUI() {
   configFolder.add(settings, 'dimensions', 200, 5000, 100).name('Cube Dimensions')
     .listen().onFinishChange(v => settings.reset());
   configFolder.add(settings, 'time_scale', 0.1, 5, 0.01).name('Time Scale').listen();
-  configFolder.add(settings, 'cutOff', 1, 20000 * 2, 50).name('Max Distance').listen();
+  configFolder.add(settings, 'cutOff', 1, 100000 * 2, 50).name('Max Distance').listen();
   configFolder.add(settings, 'viscosity', 0.1, 2, 0.1).name('Viscosity').listen();
   configFolder.add(settings, 'pulseDuration', 1, 100, 1).name('Click Pulse Duration').listen();
 
@@ -639,8 +639,6 @@ function updateParams() {
   }
   // Adapt time_scale based on activity.
   if (total_v > 30 && settings.time_scale > 5) settings.time_scale /= 1.1;
-  if (settings.time_scale < 0.9) settings.time_scale *= 1.01;
-  if (settings.time_scale > 1.1) settings.time_scale /= 1.01;
   if (pulse > 0) pulse -= 1;
 }
 
