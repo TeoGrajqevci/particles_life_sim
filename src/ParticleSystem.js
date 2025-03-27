@@ -9,9 +9,6 @@ export class ParticleSystem extends EventEmitter {
     this.total_v = 0;
     this.grid = [];
     this.gridDims = { nx: 0, ny: 0, nz: 0 };
-    this.pulse = 0;
-    this.pulse_x = 0;
-    this.pulse_y = 0;
     
     this.sphereGeom = new THREE.SphereGeometry(2, 5, 5);
     this.meshMaterials = this.updateMeshMaterials();
@@ -106,7 +103,7 @@ export class ParticleSystem extends EventEmitter {
   
   updateGrid() {
     const cellSize = Math.sqrt(this.settings.cutOff);
-    // Décalage de la grille pour éviter un alignement fixe
+    // Offset grid to avoid fixed alignment
     const offset = cellSize / 2;
     this.gridDims.nx = Math.ceil((this.settings.dimensions + offset) / cellSize);
     this.gridDims.ny = this.gridDims.nx;
@@ -114,13 +111,13 @@ export class ParticleSystem extends EventEmitter {
     const nCells = this.gridDims.nx * this.gridDims.ny * this.gridDims.nz;
     this.grid = new Array(nCells);
     for (let i = 0; i < nCells; i++) this.grid[i] = [];
-    // Placer chaque atome dans sa cellule avec décalage
+    // Place each atom in its cell with offset
     for (let i = 0; i < this.atoms.length; i++) {
       const a = this.atoms[i];
       let cx = Math.floor((a[0] + offset) / cellSize);
       let cy = Math.floor((a[1] + offset) / cellSize);
       let cz = Math.floor((a[2] + offset) / cellSize);
-      // Clamp des indices
+      // Clamp indices
       cx = Math.min(cx, this.gridDims.nx - 1);
       cy = Math.min(cy, this.gridDims.ny - 1);
       cz = Math.min(cz, this.gridDims.nz - 1);
@@ -167,23 +164,12 @@ export class ParticleSystem extends EventEmitter {
                 fx += F * dx_;
                 fy += F * dy_;
                 fz += F * dz_;
-                // (Optional) Draw lines if settings.drawings.lines is enabled.
               }
             }
           }
         }
       }
-      // Apply pulse if active.
-      if (this.pulse !== 0) {
-        const dx_ = ax - this.pulse_x;
-        const dy_ = ay - this.pulse_y;
-        const d2 = dx_ * dx_ + dy_ * dy_;
-        if (d2 > 0) {
-          const F = (100 * this.pulse) / (d2 * this.settings.time_scale);
-          fx += F * dx_;
-          fy += F * dy_;
-        }
-      }
+      
       // Update velocity (with viscosity damping).
       const vmix = 1 - this.settings.viscosity;
       a[3] = a[3] * vmix + fx * this.settings.time_scale;

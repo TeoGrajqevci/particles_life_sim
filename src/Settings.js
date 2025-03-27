@@ -11,8 +11,6 @@ export class Settings extends EventEmitter {
       radius: 0.7
     };
     this.drawings = {
-      lines: false,       // (Optional) draw interaction lines
-      circle: false,      // (Optional) draw atoms as circles
       background: {
         active: true,
         color: '#000000'
@@ -37,7 +35,6 @@ export class Settings extends EventEmitter {
     this.time_scale = 0.25;
     this.cutOff = 20000 * 2;    // cutoff squared (i.e. only if distance^2 < cutOff)
     this.viscosity = 1.7;
-    this.pulseDuration = 1;
     this.scene = {
       camera: null,
       scene: null,

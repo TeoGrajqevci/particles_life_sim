@@ -47,7 +47,9 @@ class ParticleLifeSimulation {
     
     // Setup GUI
     this.guiManager.setupGUI();
-    this.settings.gui.close();
+    
+    // Open by default
+    // this.settings.gui.open();
     
     // Event listeners
     this.guiManager.on('reset', () => {
@@ -70,11 +72,6 @@ class ParticleLifeSimulation {
     // Adapt time_scale based on activity.
     if (this.particleSystem.total_v > 30 && this.settings.time_scale > 5) {
       this.settings.time_scale /= 1.1;
-    }
-    
-    // Update pulse
-    if (this.particleSystem.pulse > 0) {
-      this.particleSystem.pulse -= 1;
     }
   }
   

@@ -17,6 +17,7 @@ export class GUIManager extends EventEmitter {
     this.particleSystem = particleSystem;
     this.sceneManager = sceneManager;
     this.gui = null;
+    this.guiStyle = undefined;
     
     // Bind references to methods that will be used as callbacks
     this.addNewColor = this.addNewColor.bind(this);
@@ -28,93 +29,164 @@ export class GUIManager extends EventEmitter {
       this.gui.destroy();
     }
     
-    this.gui = new GUI({ title: 'Particle Life Config' });
+    // Create GUI
+    this.gui = new GUI({ 
+      title: 'Particle Life Simulator'
+    });
+    
     this.settings.gui = this.gui;
     
-    // Config Folder
-    const configFolder = this.gui.addFolder('Config');
-    configFolder.add({ reset: () => this.emit('reset') }, 'reset').name('Reset');
-    configFolder.add({ randomRules: () => {
+    // Main sections
+    const simulationFolder = this.gui.addFolder('Simulation');
+    const physicsFolder = this.gui.addFolder('Physics');
+    const appearanceFolder = this.gui.addFolder('Appearance');
+    const particleColorsFolder = this.gui.addFolder('Particle Colors');
+    const rulesFolder = this.gui.addFolder('Interaction Rules');
+    
+    // Ensure all folders start closed
+    simulationFolder.close();
+    physicsFolder.close();
+    appearanceFolder.close();
+    particleColorsFolder.close();
+    rulesFolder.close();
+    
+    // === SIMULATION FOLDER ===
+    simulationFolder.add({ reset: () => this.emit('reset') }, 'reset')
+      .name('Reset Simulation');
+      
+    // Prevent GUI from resetting when clicking on random or symmetric rules
+    simulationFolder.add({ randomRules: () => {
       this.ruleManager.randomRules();
       this.particleSystem.randomAtoms(this.settings.atoms.count, true);
-      this.updateGUIDisplay();
+      this.updateGUIDisplay(false); // Pass false to avoid resetting GUI
     }}, 'randomRules').name('Random Rules');
-    
-    configFolder.add({ symmetricRules: () => {
+
+    simulationFolder.add({ symmetricRules: () => {
       this.ruleManager.symmetricRules();
       this.particleSystem.randomAtoms(this.settings.atoms.count, true);
-      this.updateGUIDisplay();
+      this.updateGUIDisplay(false); // Pass false to avoid resetting GUI
     }}, 'symmetricRules').name('Symmetric Rules');
     
-    configFolder.add(this.settings, 'seed').name('Seed').listen();
-    configFolder.add(this.settings, 'fps').name('FPS - (Live)').listen().disable();
-    configFolder.add(this.settings.atoms, 'count', 1, 2000, 1).name('Atoms per-color')
-      .listen().onFinishChange(v => this.particleSystem.randomAtoms(v, true));
-    configFolder.add(this.settings, 'dimensions', 200, 5000, 100).name('Cube Dimensions')
-      .listen().onFinishChange(v => this.emit('reset'));
-    configFolder.add(this.settings, 'time_scale', 0.1, 5, 0.01).name('Time Scale').listen();
-    configFolder.add(this.settings, 'cutOff', 1, 100000 * 2, 50).name('Max Distance').listen();
-    configFolder.add(this.settings, 'viscosity', 0.1, 1.99, 0.1).name('Viscosity').listen();
-    configFolder.add(this.settings, 'pulseDuration', 1, 100, 1).name('Click Pulse Duration').listen();
+    simulationFolder.add(this.settings, 'seed')
+      .name('Seed')
+      .listen();
+      
+    simulationFolder.add(this.settings, 'fps')
+      .name('FPS')
+      .listen()
+      .disable();
 
-    // Drawings Folder
-    const drawingsFolder = this.gui.addFolder('Drawings');
-    drawingsFolder.add(this.settings.atoms, 'radius', 0.1, 10, 0.1).name('Radius')
-      .listen().onFinishChange(v => {
+    // === PHYSICS FOLDER ===
+    physicsFolder.add(this.settings.atoms, 'count', 1, 2000, 1)
+      .name('Atoms per-color')
+      .listen()
+      .onFinishChange(v => this.particleSystem.randomAtoms(v, true));
+      
+    physicsFolder.add(this.settings, 'dimensions', 200, 5000, 100)
+      .name('World Size')
+      .listen()
+      .onFinishChange(v => this.emit('reset'));
+      
+    physicsFolder.add(this.settings, 'time_scale', 0.1, 5, 0.01)
+      .name('Time Scale')
+      .listen();
+      
+    physicsFolder.add(this.settings, 'cutOff', 1, 100000 * 2, 50)
+      .name('Interaction Range')
+      .listen();
+      
+    physicsFolder.add(this.settings, 'viscosity', 0.1, 1.99, 0.1)
+      .name('Viscosity')
+      .listen();
+    
+    // === APPEARANCE FOLDER ===
+    appearanceFolder.add(this.settings.atoms, 'radius', 0.1, 10, 0.1)
+      .name('Particle Size')
+      .listen()
+      .onFinishChange(v => {
         this.particleSystem.updateAtomRadius(v);
       });
       
     // Background settings
-    const backgroundFolder = drawingsFolder.addFolder('Background');
-    backgroundFolder.add(this.settings.drawings.background, 'active').name('Show Background')
+    const backgroundFolder = appearanceFolder.addFolder('Background');
+    backgroundFolder.add(this.settings.drawings.background, 'active')
+      .name('Show Background')
       .onChange(() => this.sceneManager.updateSceneColors());
-    backgroundFolder.addColor(this.settings.drawings.background, 'color').name('Background Color')
+      
+    backgroundFolder.addColor(this.settings.drawings.background, 'color')
+      .name('Color')
       .onChange(() => this.sceneManager.updateSceneColors());
       
     // Grid settings
-    const gridFolder = drawingsFolder.addFolder('Grid');
-    gridFolder.add(this.settings.drawings.grid, 'active').name('Show Grid')
+    const gridFolder = appearanceFolder.addFolder('Grid');
+    gridFolder.add(this.settings.drawings.grid, 'active')
+      .name('Show Grid')
       .onChange(() => {
         if (this.settings.scene.gridHelper) {
           this.settings.scene.gridHelper.visible = this.settings.drawings.grid.active;
         }
       });
-    gridFolder.addColor(this.settings.drawings.grid, 'colorCenterLine').name('Center Line Color')
-      .onChange(() => this.sceneManager.addGridHelper());
-    gridFolder.addColor(this.settings.drawings.grid, 'colorGrid').name('Grid Color')
-      .onChange(() => this.sceneManager.addGridHelper());
-    
-    // Container settings
-    const containerFolder = drawingsFolder.addFolder('Container');
-    containerFolder.addColor(this.settings.drawings.container, 'color').name('Container Color')
-      .onChange(() => this.sceneManager.updateSceneColors());
       
-    // Colors settings
-    const colorsFolder = drawingsFolder.addFolder('Particles Colors');
+    gridFolder.addColor(this.settings.drawings.grid, 'colorCenterLine')
+      .name('Center Line')
+      .onChange(() => this.sceneManager.addGridHelper());
+      
+    gridFolder.addColor(this.settings.drawings.grid, 'colorGrid')
+      .name('Grid Lines')
+      .onChange(() => this.sceneManager.addGridHelper());
     
-    // Add buttons to add/remove colors
-    colorsFolder.add({ addColor: this.addNewColor }, 'addColor').name('Add New Color');
-    colorsFolder.add({ removeColor: this.removeColor }, 'removeColor').name('Remove Last Color');
+    // === PARTICLE COLORS FOLDER ===
+    // Prevent GUI from resetting when clicking on addColor or removeColor
+    particleColorsFolder.add({ addColor: () => {
+      this.addNewColor();
+      this.updateGUIDisplay(false); // Pass false to avoid resetting GUI
+    }}, 'addColor').name('Add New Color');
+
+    particleColorsFolder.add({ removeColor: () => {
+      this.removeColor();
+      this.updateGUIDisplay(false); // Pass false to avoid resetting GUI
+    }}, 'removeColor').name('Remove Last Color');
     
+    // Add color controllers
     for (let i = 0; i < this.settings.colors.length; i++) {
-      const colorController = colorsFolder.addFolder(`Color ${i+1}`);
-      colorController.add(this.settings.colors[i], 'name').name('Name')
+      const colorController = particleColorsFolder.addFolder(`Color ${i+1}: ${this.settings.colors[i].name}`);
+      
+      colorController.add(this.settings.colors[i], 'name')
+        .name('Name')
         .onFinishChange((newName) => {
           const oldName = this.settings.colors[i].name;
           // Update color name in rules structure before updating GUI
           this.ruleManager.updateColorName(oldName, newName);
           this.updateGUIDisplay();
         });
-      colorController.addColor(this.settings.colors[i], 'value').name('Color')
+        
+      colorController.addColor(this.settings.colors[i], 'value')
+        .name('Color')
         .onChange(() => {
           this.particleSystem.updateParticleColors();
         });
     }
       
-    // Colors / Rules Folders
+    // === RULES FOLDER ===
+    // Create rule matrix interface
+    this.createRuleMatrix(rulesFolder);
+    
+    // Remove references to guiStyle.folders
+    // Open default folders (commented out as guiStyle is removed)
+    // this.settings.guiStyle.folders.expanded.forEach(folderName => {
+    //   const folder = [
+    //     simulationFolder, physicsFolder, appearanceFolder, 
+    //     particleColorsFolder, rulesFolder
+    //   ].find(f => f._title === folderName);
+    //   
+    //   if (folder) folder.open();
+    // });
+  }
+
+  createRuleMatrix(parentFolder) {
     for (const atomColor of this.settings.colors) {
       const colorName = atomColor.name;
-      const colorFolder = this.gui.addFolder(`Rules: ${colorName.capitalise()}`);
+      const colorFolder = parentFolder.addFolder(`${colorName.capitalise()}`);
       
       // Make sure the rules object structure is complete
       if (!this.settings.rules[colorName]) {
@@ -129,15 +201,45 @@ export class GUIManager extends EventEmitter {
           this.settings.rules[colorName][ruleName] = 0;
         }
         
-        colorFolder.add(this.settings.rules[colorName], ruleName, -1, 1, 0.001)
-          .name(`${colorName.capitalise()} x ${ruleName.capitalise()}`)
-          .listen().onFinishChange(() => this.ruleManager.flattenRules());
+        const controller = colorFolder.add(
+          this.settings.rules[colorName], 
+          ruleName, 
+          -1, 1, 0.01
+        )
+        .name(`${ruleName.capitalise()}`) // Removed emoji from label
+        .listen()
+        .onFinishChange((val) => {
+          // Update the controller name without emoji
+          controller.name(`${ruleName.capitalise()}`);
+          this.ruleManager.flattenRules();
+        });
       }
     }
   }
 
-  updateGUIDisplay() {
-    this.setupGUI();
+  updateGUIDisplay(resetGUI = true) {
+    if (resetGUI) {
+      // Preserve the open/closed state of folders
+      const folderStates = {};
+      if (this.gui) {
+        this.gui.folders.forEach(folder => {
+          folderStates[folder._title] = folder._closed;
+        });
+      }
+
+      this.setupGUI();
+
+      // Restore the open/closed state of folders
+      this.gui.folders.forEach(folder => {
+        if (folderStates[folder._title] !== undefined) {
+          if (folderStates[folder._title]) {
+            folder.close();
+          } else {
+            folder.open();
+          }
+        }
+      });
+    }
   }
 
   addNewColor() {
